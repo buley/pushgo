@@ -25,23 +25,25 @@ type Location struct {
     subtype string
     place Place
     published bool
+    visible bool
     children []Location
     meta interface{}
     begin int64
     end int64
 }
 
-func (location Location) valid() (bool) {
+func (location Location) valid(reference Place) (bool) {
     //check if published or hidden
+    log.Printf("Reference location: %f, %f", reference.point.latitude, reference.point.longitude);
     if ( true == location.public() && true == location.nearby() && true == location.timely() ) {
         return true;
     }
     return false;
 }
 
-//if is published
+//if is published and publicly visible
 func (location Location) public() (bool) {
-    return location.published;
+    return location.published && location.visible;
 }
 
 //if no begin/end set or ( begin/end exists && valid )
@@ -70,17 +72,17 @@ func (location Location) nearby() (bool) {
 
 
 //TODO: pass valid() func as generic arg
-func collapse( nodes []Location, found []Location ) ( []Location )  {
+func collapse( nodes []Location, reference Place, found []Location ) ( []Location )  {
     var deep []Location = []Location{}
     if len(nodes) > 0 {
         for _, child := range nodes {
-            if true == child.valid() {
+            if true == child.valid(reference) {
                 found = append( found, []Location{
                  child,   
                 }... )
             }
             if children := child.children; len(children) > 0 {
-                deep = append( deep, collapse( children, []Location{} )... );
+                deep = append( deep, collapse( children, reference, []Location{} )... );
             }
         }
     }
@@ -99,6 +101,7 @@ func init() {
             name: "United States",
             subtype: "country",
             published: true,
+            visible: false,
             begin: 0,
             end: 0,
             place: Place{
@@ -115,6 +118,7 @@ func init() {
                     name: "CA",
                     subtype: "state",
                     published: true,
+                    visible: true,
                     begin: 0,
                     end: 0,
                     children: []Location{
@@ -137,6 +141,7 @@ func init() {
                                     name: "Bistro 33",
                                     subtype: "location",
                                     published: true,
+                                    visible: true,
                                     begin: 0,
                                     end: 0,
                                     place: Place{
@@ -155,6 +160,7 @@ func init() {
                                     name: "Guadajara Grill",
                                     subtype: "location",
                                     published: true,
+                                    visible: true,
                                     begin: 0,
                                     end: 0,
                                     place: Place{
@@ -171,6 +177,7 @@ func init() {
                                             name: "Guadalajara Porch",
                                             subtype: "location",
                                             published: true,
+                                            visible: true,
                                             begin: 1407211227,
                                             end: 1407211740,
                                             place: Place{
@@ -189,6 +196,7 @@ func init() {
                                             name: "Guadajara Interior",
                                             subtype: "location",
                                             published: false,
+                                            visible: true,
                                             begin: 0,
                                             end: 1407211227,
                                             place: Place{
@@ -216,9 +224,16 @@ func init() {
             meta: nil,
         }
 
-        //var lat float64 = 38.5445404
-        //var lon float64 = -121.7398277
-        for _, v := range collapse( []Location{ united_states }, make([]Location,0) ) {
+        var reference = Place{
+            point: Point{
+                latitude: 38.5445404,
+                longitude: -121.7398277,
+            },
+            radius: Radius{
+                avg: 5.0,
+            },
+        }
+        for _, v := range collapse( []Location{ united_states }, reference, make([]Location,0) ) {
             log.Print( "Place " + v.name );
         }
 
