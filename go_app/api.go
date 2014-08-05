@@ -33,16 +33,14 @@ type Location struct {
 
 func (location Location) valid() (bool) {
     //check if published or hidden
-
-
-    if ( true == location.nearby() && true == location.timely() ) {
+    if ( true == location.public() && true == location.nearby() && true == location.timely() ) {
         return true;
     }
     return false;
 }
 
 //if is published
-func (location Location) visible() (bool) {
+func (location Location) public() (bool) {
     return location.published;
 }
 
@@ -51,9 +49,16 @@ func (location Location) timely() (bool) {
     if ( 0 == location.begin && 0 == location.end ) {
         return true;
     } 
-    var timestamp =  time.Now().Local().Unix();
-    if ( ( 0 == location.begin && location.end < timestamp ) ||  ( location.begin < timestamp ) ) {
-        return false;
+    var timestamp = time.Now().Local().Unix();
+    if ( 0 != location.end ) {
+        if ( location.end < timestamp ) {
+            return false;
+        }
+    } 
+    if ( 0 != location.begin ) {
+        if ( location.begin > timestamp ) {
+            return false;
+        }
     }
     return true;
 }
@@ -63,16 +68,16 @@ func (location Location) nearby() (bool) {
     return true;
 }
 
+
+//TODO: pass valid() func as generic arg
 func collapse( nodes []Location, found []Location ) ( []Location )  {
     var deep []Location = []Location{}
     if len(nodes) > 0 {
         for _, child := range nodes {
-            var single []Location = []Location{
-                child,
-            }
-
             if true == child.valid() {
-                found = append( found, single... )
+                found = append( found, []Location{
+                 child,   
+                }... )
             }
             if children := child.children; len(children) > 0 {
                 deep = append( deep, collapse( children, []Location{} )... );
@@ -166,8 +171,8 @@ func init() {
                                             name: "Guadalajara Porch",
                                             subtype: "location",
                                             published: true,
-                                            begin: 0,
-                                            end: 0,
+                                            begin: 1407211227,
+                                            end: 1407211740,
                                             place: Place{
                                                 point: Point{
                                                     latitude: 38.5444038,
@@ -185,7 +190,7 @@ func init() {
                                             subtype: "location",
                                             published: false,
                                             begin: 0,
-                                            end: 0,
+                                            end: 1407211227,
                                             place: Place{
                                                 point: Point{
                                                     latitude: 38.5597532,
