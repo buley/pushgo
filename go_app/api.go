@@ -24,31 +24,62 @@ type Location struct {
     name string
     subtype string
     place Place
+    published bool
     children []Location
-}
-type Locale struct {
-    name string
-    place Place
-    children []Location
+    meta interface{}
+    begin int64
+    end int64
 }
 
-//  
+func (location Location) valid() (bool) {
+    //check if published or hidden
+
+
+    if ( true == location.nearby() && true == location.timely() ) {
+        return true;
+    }
+    return false;
+}
+
+//if is published
+func (location Location) visible() (bool) {
+    return location.published;
+}
+
+//if no begin/end set or ( begin/end exists && valid )
+func (location Location) timely() (bool) {
+    if ( 0 == location.begin && 0 == location.end ) {
+        return true;
+    } 
+    var timestamp =  time.Now().Local().Unix();
+    if ( ( 0 == location.begin && location.end < timestamp ) ||  ( location.begin < timestamp ) ) {
+        return false;
+    }
+    return true;
+}
+
+//if reference point is inside location boundry
+func (location Location) nearby() (bool) {
+    return true;
+}
+
 func collapse( nodes []Location, found []Location ) ( []Location )  {
-    var ownfound []Location = []Location{}
+    var deep []Location = []Location{}
     if len(nodes) > 0 {
         for _, child := range nodes {
             var single []Location = []Location{
                 child,
             }
-            found = append( found, single... )
+
+            if true == child.valid() {
+                found = append( found, single... )
+            }
             if children := child.children; len(children) > 0 {
-                ownfound = append( ownfound, collapse( children, ownfound )... );
-            } else {
-                log.Print("leaf: " + child.name)    
+                deep = append( deep, collapse( children, []Location{} )... );
             }
         }
     }
-    return append( found, ownfound... );
+    return append( found, deep... );
 }
 
 func init() {
@@ -62,6 +93,9 @@ func init() {
         var united_states = Location{
             name: "United States",
             subtype: "country",
+            published: true,
+            begin: 0,
+            end: 0,
             place: Place{
                 point: Point{
                     latitude: 38.5539,
@@ -75,10 +109,15 @@ func init() {
                 Location{
                     name: "CA",
                     subtype: "state",
+                    published: true,
+                    begin: 0,
+                    end: 0,
                     children: []Location{
                         Location{
                             name: "Davis",
                             subtype: "locale",
+                            begin: 0,
+                            end: 0,
                             place: Place{
                                 point: Point{
                                     latitude: 38.5539,
@@ -92,6 +131,9 @@ func init() {
                                 Location{
                                     name: "Bistro 33",
                                     subtype: "location",
+                                    published: true,
+                                    begin: 0,
+                                    end: 0,
                                     place: Place{
                                         point: Point{
                                             latitude: 38.5444038,
@@ -102,10 +144,14 @@ func init() {
                                         },
                                     },
                                     children: []Location{},
+                                    meta: nil,
                                 },
                                 Location{
                                     name: "Guadajara Grill",
                                     subtype: "location",
+                                    published: true,
+                                    begin: 0,
+                                    end: 0,
                                     place: Place{
                                         point: Point{
                                             latitude: 38.5597532,
@@ -119,6 +165,9 @@ func init() {
                                         Location{
                                             name: "Guadalajara Porch",
                                             subtype: "location",
+                                            published: true,
+                                            begin: 0,
+                                            end: 0,
                                             place: Place{
                                                 point: Point{
                                                     latitude: 38.5444038,
@@ -129,10 +178,14 @@ func init() {
                                                 },
                                             },
                                             children: []Location{},
+                                            meta: nil,
                                         },
                                         Location{
                                             name: "Guadajara Interior",
                                             subtype: "location",
+                                            published: false,
+                                            begin: 0,
+                                            end: 0,
                                             place: Place{
                                                 point: Point{
                                                     latitude: 38.5597532,
@@ -143,14 +196,19 @@ func init() {
                                                 },
                                             },
                                             children: []Location{},
+                                            meta: nil,
                                         },    
                                     },
+                                    meta: nil,
                                 },
                             },
+                            meta: nil,
                         },
                     },
+                    meta: nil,
                 },
             },
+            meta: nil,
         }
 
         //var lat float64 = 38.5445404
@@ -158,7 +216,6 @@ func init() {
         for _, v := range collapse( []Location{ united_states }, make([]Location,0) ) {
             log.Print( "Place " + v.name );
         }
-
 
         response, _ := json.Marshal(united_states.children[0].children[0].name)
 	    fmt.Fprint(w, string(response))
