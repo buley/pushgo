@@ -9,14 +9,6 @@ import (
     "math"
 )
 
-type Country struct {
-    name string
-    children []State
-}
-type State struct {
-    name string
-    children []Locale
-}
 type Radius struct {
     avg float64
 }
@@ -30,6 +22,7 @@ type Place struct {
 }
 type Location struct {
     name string
+    subtype string
     place Place
     children []Location
 }
@@ -40,12 +33,15 @@ type Locale struct {
 }
 
 //  
-func collapse( nodes []Location ) ( []Location )  {
-    var found = make([]Location,0)
+func collapse( nodes []Location, found []Location ) ( []Location )  {
     if len(nodes) > 0 {
         for _, child := range nodes {
+            var single []Location = []Location{
+                child,
+            }
+            found = append( found, single... )
             if children := child.children; len(children) > 0 {
-                found = append( found, collapse( children )... );
+                found = append( found, collapse( children, found )... );
             }
         }
     }
@@ -60,14 +56,26 @@ func init() {
             http.NotFound(w, r)
             return
         }
-        var country = Country{
+        var united_states = Location{
             name: "United States",
-            children: []State{
-                State{
+            subtype: "country",
+            place: Place{
+                point: Point{
+                    latitude: 38.5539,
+                    longitude: -121.7381,
+                },
+                radius: Radius{ 
+                    avg: 10000.0,
+                },
+            },
+            children: []Location{
+                Location{
                     name: "CA",
-                    children: []Locale{
-                        Locale{
+                    subtype: "state",
+                    children: []Location{
+                        Location{
                             name: "Davis",
+                            subtype: "locale",
                             place: Place{
                                 point: Point{
                                     latitude: 38.5539,
@@ -80,6 +88,7 @@ func init() {
                             children: []Location{
                                 Location{
                                     name: "Bistro 33",
+                                    subtype: "location",
                                     place: Place{
                                         point: Point{
                                             latitude: 38.5444038,
@@ -100,9 +109,12 @@ func init() {
 
         //var lat float64 = 38.5445404
         //var lon float64 = -121.7398277
+        for _, v := range collapse( []Location{ united_states }, make([]Location,0) ) {
+            log.Print( v.name );
+        }
 
 
-        response, _ := json.Marshal(country.children[0].children[0].name)
+        response, _ := json.Marshal(united_states.children[0].children[0].name)
 	    fmt.Fprint(w, string(response))
     } )
 }
