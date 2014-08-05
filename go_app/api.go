@@ -11,11 +11,11 @@ import (
 
 type Country struct {
     name string
-    locales []State
+    children []State
 }
 type State struct {
     name string
-    locales []Locale
+    children []Locale
 }
 type Radius struct {
     avg float64
@@ -31,11 +31,25 @@ type Place struct {
 type Location struct {
     name string
     place Place
+    children []Location
 }
 type Locale struct {
     name string
     place Place
-    locales []Location
+    children []Location
+}
+
+//  
+func collapse( nodes []Location ) ( []Location )  {
+    var found = make([]Location,0)
+    if len(nodes) > 0 {
+        for _, child := range nodes {
+            if children := child.children; len(children) > 0 {
+                found = append( found, collapse( children )... );
+            }
+        }
+    }
+    return found;
 }
 
 func init() {
@@ -48,10 +62,10 @@ func init() {
         }
         var country = Country{
             name: "United States",
-            locales: []State{
+            children: []State{
                 State{
                     name: "CA",
-                    locales: []Locale{
+                    children: []Locale{
                         Locale{
                             name: "Davis",
                             place: Place{
@@ -63,7 +77,7 @@ func init() {
                                     avg: 10000.0,
                                 },
                             },
-                            locales: []Location{
+                            children: []Location{
                                 Location{
                                     name: "Bistro 33",
                                     place: Place{
@@ -75,6 +89,7 @@ func init() {
                                             avg: 50.0,
                                         },
                                     },
+                                    children: []Location{},
                                 },
                             },
                         },
@@ -82,7 +97,12 @@ func init() {
                 },
             },
         }
-        response, _ := json.Marshal(country.locales[0].locales[0].name)
+
+        //var lat float64 = 38.5445404
+        //var lon float64 = -121.7398277
+
+
+        response, _ := json.Marshal(country.children[0].children[0].name)
 	    fmt.Fprint(w, string(response))
     } )
 }
