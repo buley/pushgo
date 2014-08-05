@@ -35,6 +35,7 @@ type Location struct {
 func (location Location) valid(reference Place) (bool) {
     //check if published or hidden
     log.Printf("Reference location: %f, %f", reference.point.latitude, reference.point.longitude);
+    log.Printf("Check location: %f, %f", location.place.point.latitude, location.place.point.longitude);
     if ( true == location.public() && true == location.nearby() && true == location.timely() ) {
         return true;
     }
