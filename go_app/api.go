@@ -34,6 +34,7 @@ type Locale struct {
 
 //  
 func collapse( nodes []Location, found []Location ) ( []Location )  {
+    var ownfound []Location = []Location{}
     if len(nodes) > 0 {
         for _, child := range nodes {
             var single []Location = []Location{
@@ -41,11 +42,13 @@ func collapse( nodes []Location, found []Location ) ( []Location )  {
             }
             found = append( found, single... )
             if children := child.children; len(children) > 0 {
-                found = append( found, collapse( children, found )... );
+                ownfound = append( ownfound, collapse( children, ownfound )... );
+            } else {
+                log.Print("leaf: " + child.name)    
             }
         }
     }
-    return found;
+    return append( found, ownfound... );
 }
 
 func init() {
@@ -100,6 +103,49 @@ func init() {
                                     },
                                     children: []Location{},
                                 },
+                                Location{
+                                    name: "Guadajara Grill",
+                                    subtype: "location",
+                                    place: Place{
+                                        point: Point{
+                                            latitude: 38.5597532,
+                                            longitude: -121.7568926,
+                                        },
+                                        radius: Radius{
+                                            avg: 50.0,
+                                        },
+                                    },
+                                    children: []Location{
+                                        Location{
+                                            name: "Guadalajara Porch",
+                                            subtype: "location",
+                                            place: Place{
+                                                point: Point{
+                                                    latitude: 38.5444038,
+                                                    longitude: -121.7397349,
+                                                },
+                                                radius: Radius{
+                                                    avg: 50.0,
+                                                },
+                                            },
+                                            children: []Location{},
+                                        },
+                                        Location{
+                                            name: "Guadajara Interior",
+                                            subtype: "location",
+                                            place: Place{
+                                                point: Point{
+                                                    latitude: 38.5597532,
+                                                    longitude: -121.7568926,
+                                                },
+                                                radius: Radius{
+                                                    avg: 50.0,
+                                                },
+                                            },
+                                            children: []Location{},
+                                        },    
+                                    },
+                                },
                             },
                         },
                     },
@@ -110,7 +156,7 @@ func init() {
         //var lat float64 = 38.5445404
         //var lon float64 = -121.7398277
         for _, v := range collapse( []Location{ united_states }, make([]Location,0) ) {
-            log.Print( v.name );
+            log.Print( "Place " + v.name );
         }
 
 
