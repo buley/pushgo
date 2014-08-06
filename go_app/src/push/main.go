@@ -8,6 +8,7 @@ import (
     "time"
     "math"
     "sort"
+    "strings"
 )
 
 type Radius struct {
@@ -25,7 +26,7 @@ type Place struct {
     distance float64
 }
 type Location struct {
-    name string
+    id string
     subtype string
     place Place
     published bool
@@ -40,7 +41,7 @@ type Location struct {
 
 func Data() (Location) {
         var united_states = Location{
-            name: "United States",
+            id: "United States",
             subtype: "country",
             published: true,
             visible: true,
@@ -61,7 +62,7 @@ func Data() (Location) {
             },
             children: []Location{
                 Location{
-                    name: "CA",
+                    id: "CA",
                     subtype: "state",
                     published: true,
                     visible: true,
@@ -82,7 +83,7 @@ func Data() (Location) {
                     },
                     children: []Location{
                         Location{
-                            name: "Davis",
+                            id: "Davis",
                             subtype: "locale",
                             begin: 0,
                             published: true,
@@ -103,7 +104,7 @@ func Data() (Location) {
                             },
                             children: []Location{
                                 Location{
-                                    name: "Bistro 33",
+                                    id: "Bistro 33",
                                     subtype: "location",
                                     published: true,
                                     visible: true,
@@ -126,7 +127,7 @@ func Data() (Location) {
                                     meta: nil,
                                 },
                                 Location{
-                                    name: "Guadajara Grill",
+                                    id: "Guadajara Grill",
                                     subtype: "location",
                                     published: true,
                                     visible: true,
@@ -147,7 +148,7 @@ func Data() (Location) {
                                     },
                                     children: []Location{
                                         Location{
-                                            name: "Guadalajara Porch",
+                                            id: "Guadalajara Porch",
                                             subtype: "location",
                                             published: true,
                                             visible: true,
@@ -231,12 +232,12 @@ func distance(target Place, reference Place) (float64) {
     return (float64(6371000) * float64(2) * math.Atan2( math.Sqrt(a), math.Sqrt(1-a) ) );
 }
 
-
 //TODO: pass valid() func as generic arg
 func collapse( nodes []Location, reference Place, found []Location ) ( []Location )  {
     var deep []Location = []Location{}
     var keys []float64
-    const SORT string = "DESC" //ASC else DESC
+
+
     if len(nodes) > 0 {
         for _, child := range nodes {
             if true == child.valid(reference) {
@@ -262,7 +263,7 @@ func collapse( nodes []Location, reference Place, found []Location ) ( []Locatio
     }
     sort.Float64s(keys)
     var tmp []Location;
-    if "ASC" == SORT {
+    if "ASC" == SORT { //TODO: try a switch
         n := len(keys) 
         for i := n; i > 0; i-- { 
             var value float64 = keys[i - 1]
@@ -291,11 +292,16 @@ func collapse( nodes []Location, reference Place, found []Location ) ( []Locatio
     return tmp;
 }
 
+//TODO: Url parsing http://localhost:8080/presence#id%3D123%26lat%3D38.549210%26lng%3D-121.696164%26time%3D1407302303
+const MAX_RADIUS float64 = 500.0
+const AVG_RADIUS float64 = 20.0
+const SORT string = "DESC" //ASC else DESC
+const LIMIT int = 0
+
 func init() {
     log.Printf("Started %d", time.Now().Local().Unix())
-
 	http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
-        if r.URL.Path != "/" {
+        if r.URL.Path != "/" && r.URL.Path != "/presence" {
             http.NotFound(w, r)
             return
         }
@@ -307,16 +313,17 @@ func init() {
             },
             radius: Radius{
                 min: 0.0,
-                avg: 20.0,
-                max: 50.0,
+                avg: AVG_RADIUS,
+                max: MAX_RADIUS,
             },
         }, make([]Location,0) ) {
-            //log.Print( "Place " + v.name );
-            if true == v.visible {
+            if ( 0 != LIMIT && len(matching) >= LIMIT ) {
+                break;
+            }
+            if true == v.visible && v.place.distance < MAX_RADIUS {
                 matching = append(matching, []map[string]interface{}{
-                    map[string]interface{}{
-                    "name": v.name,
-                    "subtype": v.subtype,
+                    map[string]interface{}{ //TODO: Pass inbound anonymous id
+                    "uri": "/" + v.subtype + "/" + strings.Replace( v.id, " ", "_", -1 ) + "/#lat%3D" + fmt.Sprintf("%f", v.place.point.latitude) + "%26lng%3D" + fmt.Sprintf("%f", v.place.point.longitude) + "%26time%3D" + fmt.Sprintf("%d", time.Now().Local().Unix() ),
                     "begin": v.begin,
                     "end": v.end,
                     "displayed": v.displayed,
@@ -330,8 +337,9 @@ func init() {
                     
         }
         response, _ := json.Marshal(matching)
-        log.Print("RESPONSE: %s", string(response))
+        log.Printf("RESPONSE: %s", string(response))
         fmt.Fprint(w, string(response))
+
 
     } )
 }
