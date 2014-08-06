@@ -1,4 +1,4 @@
-package store
+package push
 
 import (
 	"fmt"
@@ -7,10 +7,13 @@ import (
     "log"
     "time"
     "math"
+    "sort"
 )
 
 type Radius struct {
     avg float64
+    min float64
+    max float64
 }
 type Point struct {
     latitude float64
@@ -19,6 +22,7 @@ type Point struct {
 type Place struct {
     point Point
     radius Radius
+    distance float64
 }
 type Location struct {
     name string
@@ -26,6 +30,7 @@ type Location struct {
     place Place
     published bool
     visible bool
+    displayed bool
     children []Location
     meta interface{}
     begin int64
@@ -33,12 +38,13 @@ type Location struct {
 }
 
 
-func Country() (Location) {
+func Data() (Location) {
         var united_states = Location{
             name: "United States",
             subtype: "country",
             published: true,
-            visible: false,
+            visible: true,
+            displayed: false,
             begin: 0,
             end: 0,
             place: Place{
@@ -48,7 +54,10 @@ func Country() (Location) {
                 },
                 radius: Radius{ 
                     avg: 2156500.0, //.5(horizontal width of US) in meters
+                    max: 2156500.0,
+                    min: 0.0,
                 },
+                distance: 0.0,
             },
             children: []Location{
                 Location{
@@ -56,6 +65,7 @@ func Country() (Location) {
                     subtype: "state",
                     published: true,
                     visible: true,
+                    displayed: true,
                     begin: 0,
                     end: 0,
                     place: Place{
@@ -65,7 +75,10 @@ func Country() (Location) {
                         },
                         radius: Radius{
                             avg: 676000.0,
+                            max: 676000.0,
+                            min: 0.0,
                         },
+                        distance: 0.0,
                     },
                     children: []Location{
                         Location{
@@ -74,6 +87,7 @@ func Country() (Location) {
                             begin: 0,
                             published: true,
                             visible: true,
+                            displayed: true,
                             end: 0,
                             place: Place{
                                 point: Point{
@@ -82,7 +96,10 @@ func Country() (Location) {
                                 },
                                 radius: Radius{ 
                                     avg: 25000.00,
+                                    max: 25000.00,
+                                    min: 0,
                                 },
+                                distance: 0.0,
                             },
                             children: []Location{
                                 Location{
@@ -90,6 +107,7 @@ func Country() (Location) {
                                     subtype: "location",
                                     published: true,
                                     visible: true,
+                                    displayed: true,
                                     begin: 0,
                                     end: 0,
                                     place: Place{
@@ -99,7 +117,10 @@ func Country() (Location) {
                                         },
                                         radius: Radius{
                                             avg: 50.0,
+                                            max: 50.0,
+                                            min: 0,
                                         },
+                                        distance: 0.0,
                                     },
                                     children: []Location{},
                                     meta: nil,
@@ -109,6 +130,7 @@ func Country() (Location) {
                                     subtype: "location",
                                     published: true,
                                     visible: true,
+                                    displayed: true,
                                     begin: 0,
                                     end: 0,
                                     place: Place{
@@ -117,8 +139,11 @@ func Country() (Location) {
                                             longitude: -121.6961637,
                                         },
                                         radius: Radius{
-                                            avg: 100.0,
+                                            avg: 10.0,
+                                            max: 20.0,
+                                            min: 0.0,
                                         },
+                                        distance: 0.0,
                                     },
                                     children: []Location{
                                         Location{
@@ -126,39 +151,24 @@ func Country() (Location) {
                                             subtype: "location",
                                             published: true,
                                             visible: true,
+                                            displayed: true,
                                             begin: 1407211227,
                                             end: 1407211740,
                                             place: Place{
                                                 point: Point{
-                                                    latitude: 38.5444038,
-                                                    longitude: -121.7397349,
+                                                    latitude: 38.5492101,
+                                                    longitude: -121.6961637,
                                                 },
                                                 radius: Radius{
-                                                    avg: 50.0,
+                                                    avg: 40.0,
+                                                    max: 50.0,
+                                                    min: 20.0,
                                                 },
+                                                distance: 0.0,
                                             },
                                             children: []Location{},
                                             meta: nil,
                                         },
-                                        Location{
-                                            name: "Guadajara Interior",
-                                            subtype: "location",
-                                            published: false,
-                                            visible: true,
-                                            begin: 0,
-                                            end: 1407211227,
-                                            place: Place{
-                                                point: Point{
-                                                    latitude: 38.5597532,
-                                                    longitude: -121.7568926,
-                                                },
-                                                radius: Radius{
-                                                    avg: 50.0,
-                                                },
-                                            },
-                                            children: []Location{},
-                                            meta: nil,
-                                        },    
                                     },
                                     meta: nil,
                                 },
@@ -178,8 +188,8 @@ func Country() (Location) {
 
 
 func (location Location) valid(reference Place) (bool) {
-    //checks if 1) public 2) nearby and 3) timely
-    if ( true == location.public() && true == location.nearby(location.place, reference) && true == location.timely() ) {
+    //checks if 1) public and 2) timely
+    if ( true == location.public() && true == location.timely() ) {
         return true;
     }
     return false;
@@ -220,36 +230,65 @@ func distance(target Place, reference Place) (float64) {
     //6371 = Earth's radius in km 
     return (float64(6371000) * float64(2) * math.Atan2( math.Sqrt(a), math.Sqrt(1-a) ) );
 }
-//if reference point is inside location boundry
-func (location Location) nearby(target Place, reference Place) (bool) {
-    var radius_meters float64 = target.radius.avg + reference.radius.avg;
-    //log.Printf("Reference location: %f, %f", reference.point.latitude, reference.point.longitude);
-    log.Printf("Target location: %f, %f", target.point.latitude, target.point.longitude);
-    //log.Printf("Radius: %d meters", radius_meters );
-    var distance float64 = distance(target, reference)
-    log.Printf("Distance: %f meters", distance);
-    return distance < float64(radius_meters);
-}
 
 
 //TODO: pass valid() func as generic arg
 func collapse( nodes []Location, reference Place, found []Location ) ( []Location )  {
     var deep []Location = []Location{}
+    var keys []float64
+    const SORT string = "DESC" //ASC else DESC
     if len(nodes) > 0 {
         for _, child := range nodes {
             if true == child.valid(reference) {
-                found = append( found, []Location{
-                 child,   
-                }... )
-                if children := child.children; len(children) > 0 {
-                    deep = append( deep, collapse( children, reference, []Location{} )... );
+                var target Place = child.place
+                var max_radius float64 = target.radius.max + reference.radius.max;
+                var meters_away float64 = distance(target, reference)
+                if meters_away < float64(max_radius) {
+                    child.place.distance = meters_away
+                    found = append( found, []Location{
+                     child,   
+                    }... )
+                    if children := child.children; len(children) > 0 {
+                        deep = append( deep, collapse( children, reference, []Location{} )... );
+                    }
                 }
-            } else {
-                log.Print("Invalid node " + child.name);
+            }
+        }
+
+    }
+    found = append(found, deep...);
+    for _, child := range found {
+        keys = append(keys, child.place.distance);
+    }
+    sort.Float64s(keys)
+    var tmp []Location;
+    if "ASC" == SORT {
+        n := len(keys) 
+        for i := n; i > 0; i-- { 
+            var value float64 = keys[i - 1]
+            for _, child := range found {
+                if value == child.place.distance {
+                    log.Print("found VALUE", value, child.place.distance)
+                    tmp = append(tmp, child);
+                } else {
+                    log.Print("mismatch", value, child.place.distance)
+                }
+            }
+        }
+    } else {
+        for i, _ := range keys { 
+            var value float64 = keys[i]
+            for _, child := range found {
+                if value == child.place.distance {
+                    log.Print("found VALUE", value, child.place.distance)
+                    tmp = append(tmp, child);
+                } else {
+                    log.Print("mismatch", value, child.place.distance)
+                }
             }
         }
     }
-    return append( found, deep... );
+    return tmp;
 }
 
 func init() {
@@ -260,21 +299,40 @@ func init() {
             http.NotFound(w, r)
             return
         }
-        var original Location = Country()
-        var reference = Place{
+        var matching []map[string]interface{}
+        for _, v := range collapse( []Location{ Data() }, Place{
             point: Point{
                 latitude: 38.5501232, //38.5445404,
                 longitude: -121.695873, //-121.7398277,
             },
             radius: Radius{
+                min: 0.0,
                 avg: 20.0,
+                max: 50.0,
             },
+        }, make([]Location,0) ) {
+            //log.Print( "Place " + v.name );
+            if true == v.visible {
+                matching = append(matching, []map[string]interface{}{
+                    map[string]interface{}{
+                    "name": v.name,
+                    "subtype": v.subtype,
+                    "begin": v.begin,
+                    "end": v.end,
+                    "displayed": v.displayed,
+                    "latitude": v.place.point.latitude,
+                    "longitude": v.place.point.longitude,
+                    "radius": v.place.radius.avg,
+                    "distance": v.place.distance,
+                    },
+                }...);
+            }
+                    
         }
-        for _, v := range collapse( []Location{ original }, reference, make([]Location,0) ) {
-            log.Print( "Place " + v.name );
-        }
-        response, _ := json.Marshal(original.children[0].children[0].name)
+        response, _ := json.Marshal(matching)
+        log.Print("RESPONSE: %s", string(response))
         fmt.Fprint(w, string(response))
+
     } )
 }
 
