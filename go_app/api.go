@@ -33,10 +33,8 @@ type Location struct {
 }
 
 func (location Location) valid(reference Place) (bool) {
-    //check if published or hidden
-    log.Printf("Reference location: %f, %f", reference.point.latitude, reference.point.longitude);
-    log.Printf("Check location: %f, %f", location.place.point.latitude, location.place.point.longitude);
-    if ( true == location.public() && true == location.nearby() && true == location.timely() ) {
+    //checks if 1) public 2) nearby and 3) timely
+    if ( true == location.public() && true == location.nearby(location.place, reference) && true == location.timely() ) {
         return true;
     }
     return false;
@@ -44,7 +42,7 @@ func (location Location) valid(reference Place) (bool) {
 
 //if is published and publicly visible
 func (location Location) public() (bool) {
-    return location.published && location.visible;
+    return location.published;
 }
 
 //if no begin/end set or ( begin/end exists && valid )
@@ -66,9 +64,26 @@ func (location Location) timely() (bool) {
     return true;
 }
 
+func toRadians(degrees float64) (float64) {
+    return (degrees * (math.Pi/180))
+}
+
+func distance(target Place, reference Place) (float64) {
+    var deltaLat float64 = toRadians(target.point.latitude - reference.point.latitude);
+    var deltaLon float64 = toRadians(target.point.longitude - reference.point.longitude);
+    var a float64 = math.Sin(deltaLat/float64(2)) * math.Sin(deltaLat/float64(2)) + math.Cos(toRadians(reference.point.latitude)) * math.Cos(toRadians(target.point.latitude)) * math.Sin(deltaLon/float64(2)) * math.Sin(deltaLon/float64(2));
+    //6371 = Earth's radius in km 
+    return (float64(6371000) * float64(2) * math.Atan2( math.Sqrt(a), math.Sqrt(1-a) ) );
+}
 //if reference point is inside location boundry
-func (location Location) nearby() (bool) {
-    return true;
+func (location Location) nearby(target Place, reference Place) (bool) {
+    var radius_meters float64 = target.radius.avg + reference.radius.avg;
+    //log.Printf("Reference location: %f, %f", reference.point.latitude, reference.point.longitude);
+    log.Printf("Target location: %f, %f", target.point.latitude, target.point.longitude);
+    //log.Printf("Radius: %d meters", radius_meters );
+    var distance float64 = distance(target, reference)
+    log.Printf("Distance: %f meters", distance);
+    return distance < float64(radius_meters);
 }
 
 
@@ -81,9 +96,11 @@ func collapse( nodes []Location, reference Place, found []Location ) ( []Locatio
                 found = append( found, []Location{
                  child,   
                 }... )
-            }
-            if children := child.children; len(children) > 0 {
-                deep = append( deep, collapse( children, reference, []Location{} )... );
+                if children := child.children; len(children) > 0 {
+                    deep = append( deep, collapse( children, reference, []Location{} )... );
+                }
+            } else {
+                log.Print("Invalid node " + child.name);
             }
         }
     }
@@ -107,11 +124,11 @@ func init() {
             end: 0,
             place: Place{
                 point: Point{
-                    latitude: 38.5539,
-                    longitude: -121.7381,
+                    latitude: 39.8282,
+                    longitude: -98.5795,
                 },
                 radius: Radius{ 
-                    avg: 10000.0,
+                    avg: 2156500.0, //.5(horizontal width of US) in meters
                 },
             },
             children: []Location{
@@ -122,11 +139,22 @@ func init() {
                     visible: true,
                     begin: 0,
                     end: 0,
+                    place: Place{
+                        point: Point{
+                            latitude: 36.1700,
+                            longitude: -119.7462,
+                        },
+                        radius: Radius{
+                            avg: 676000.0,
+                        },
+                    },
                     children: []Location{
                         Location{
                             name: "Davis",
                             subtype: "locale",
                             begin: 0,
+                            published: true,
+                            visible: true,
                             end: 0,
                             place: Place{
                                 point: Point{
@@ -134,7 +162,7 @@ func init() {
                                     longitude: -121.7381,
                                 },
                                 radius: Radius{ 
-                                    avg: 10000.0,
+                                    avg: 25000.00,
                                 },
                             },
                             children: []Location{
@@ -166,11 +194,11 @@ func init() {
                                     end: 0,
                                     place: Place{
                                         point: Point{
-                                            latitude: 38.5597532,
-                                            longitude: -121.7568926,
+                                            latitude: 38.5492101,
+                                            longitude: -121.6961637,
                                         },
                                         radius: Radius{
-                                            avg: 50.0,
+                                            avg: 100.0,
                                         },
                                     },
                                     children: []Location{
@@ -227,11 +255,11 @@ func init() {
 
         var reference = Place{
             point: Point{
-                latitude: 38.5445404,
-                longitude: -121.7398277,
+                latitude: 38.5501232, //38.5445404,
+                longitude: -121.695873, //-121.7398277,
             },
             radius: Radius{
-                avg: 5.0,
+                avg: 20.0,
             },
         }
         for _, v := range collapse( []Location{ united_states }, reference, make([]Location,0) ) {
@@ -243,18 +271,3 @@ func init() {
     } )
 }
 
-func toRadians(degrees float64) (float64) {
-    return (degrees * (math.Pi/180))
-}
-
-func nearby(latTarget float64, lonTarget float64, latRef float64, lonRef float64, radius int) (bool) {
-    return (distance(latTarget, lonTarget, latRef, lonRef) < float64(radius));
-}
-
-func distance(lat1 float64, lon1 float64, lat2 float64, lon2 float64) (float64) {
-    var deltaLat float64 = toRadians(lat2-lat1)
-    var deltaLon float64 = toRadians(lon2-lon1)
-    var a float64 = math.Sin(deltaLat/float64(2)) * math.Sin(deltaLat/float64(2)) + math.Cos(toRadians(lat1)) * math.Cos(toRadians(lat2)) * math.Sin(deltaLon/float64(2)) * math.Sin(deltaLon/float64(2));
-    //6371 = Earth's radius in km 
-    return (float64(6371) * float64(2) * math.Atan2( math.Sqrt(a), math.Sqrt(1-a) ) );
-}
