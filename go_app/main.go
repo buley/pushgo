@@ -1,4 +1,4 @@
-package pushgo
+package store
 
 import (
 	"fmt"
@@ -32,89 +32,8 @@ type Location struct {
     end int64
 }
 
-func (location Location) valid(reference Place) (bool) {
-    //checks if 1) public 2) nearby and 3) timely
-    if ( true == location.public() && true == location.nearby(location.place, reference) && true == location.timely() ) {
-        return true;
-    }
-    return false;
-}
 
-//if is published and publicly visible
-func (location Location) public() (bool) {
-    return location.published;
-}
-
-//if no begin/end set or ( begin/end exists && valid )
-func (location Location) timely() (bool) {
-    if ( 0 == location.begin && 0 == location.end ) {
-        return true;
-    } 
-    var timestamp = time.Now().Local().Unix();
-    if ( 0 != location.end ) {
-        if ( location.end < timestamp ) {
-            return false;
-        }
-    } 
-    if ( 0 != location.begin ) {
-        if ( location.begin > timestamp ) {
-            return false;
-        }
-    }
-    return true;
-}
-
-func toRadians(degrees float64) (float64) {
-    return (degrees * (math.Pi/180))
-}
-
-func distance(target Place, reference Place) (float64) {
-    var deltaLat float64 = toRadians(target.point.latitude - reference.point.latitude);
-    var deltaLon float64 = toRadians(target.point.longitude - reference.point.longitude);
-    var a float64 = math.Sin(deltaLat/float64(2)) * math.Sin(deltaLat/float64(2)) + math.Cos(toRadians(reference.point.latitude)) * math.Cos(toRadians(target.point.latitude)) * math.Sin(deltaLon/float64(2)) * math.Sin(deltaLon/float64(2));
-    //6371 = Earth's radius in km 
-    return (float64(6371000) * float64(2) * math.Atan2( math.Sqrt(a), math.Sqrt(1-a) ) );
-}
-//if reference point is inside location boundry
-func (location Location) nearby(target Place, reference Place) (bool) {
-    var radius_meters float64 = target.radius.avg + reference.radius.avg;
-    //log.Printf("Reference location: %f, %f", reference.point.latitude, reference.point.longitude);
-    log.Printf("Target location: %f, %f", target.point.latitude, target.point.longitude);
-    //log.Printf("Radius: %d meters", radius_meters );
-    var distance float64 = distance(target, reference)
-    log.Printf("Distance: %f meters", distance);
-    return distance < float64(radius_meters);
-}
-
-
-//TODO: pass valid() func as generic arg
-func collapse( nodes []Location, reference Place, found []Location ) ( []Location )  {
-    var deep []Location = []Location{}
-    if len(nodes) > 0 {
-        for _, child := range nodes {
-            if true == child.valid(reference) {
-                found = append( found, []Location{
-                 child,   
-                }... )
-                if children := child.children; len(children) > 0 {
-                    deep = append( deep, collapse( children, reference, []Location{} )... );
-                }
-            } else {
-                log.Print("Invalid node " + child.name);
-            }
-        }
-    }
-    return append( found, deep... );
-}
-
-func init() {
-    log.Printf("Started %d", time.Now().Local().Unix())
-
-	http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
-        if r.URL.Path != "/" {
-            http.NotFound(w, r)
-            return
-        }
+func Country() (Location) {
         var united_states = Location{
             name: "United States",
             subtype: "country",
@@ -253,6 +172,95 @@ func init() {
             meta: nil,
         }
 
+    return united_states;
+}
+
+
+
+func (location Location) valid(reference Place) (bool) {
+    //checks if 1) public 2) nearby and 3) timely
+    if ( true == location.public() && true == location.nearby(location.place, reference) && true == location.timely() ) {
+        return true;
+    }
+    return false;
+}
+
+//if is published and publicly visible
+func (location Location) public() (bool) {
+    return location.published;
+}
+
+//if no begin/end set or ( begin/end exists && valid )
+func (location Location) timely() (bool) {
+    if ( 0 == location.begin && 0 == location.end ) {
+        return true;
+    } 
+    var timestamp = time.Now().Local().Unix();
+    if ( 0 != location.end ) {
+        if ( location.end < timestamp ) {
+            return false;
+        }
+    } 
+    if ( 0 != location.begin ) {
+        if ( location.begin > timestamp ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+func toRadians(degrees float64) (float64) {
+    return (degrees * (math.Pi/180))
+}
+
+func distance(target Place, reference Place) (float64) {
+    var deltaLat float64 = toRadians(target.point.latitude - reference.point.latitude);
+    var deltaLon float64 = toRadians(target.point.longitude - reference.point.longitude);
+    var a float64 = math.Sin(deltaLat/float64(2)) * math.Sin(deltaLat/float64(2)) + math.Cos(toRadians(reference.point.latitude)) * math.Cos(toRadians(target.point.latitude)) * math.Sin(deltaLon/float64(2)) * math.Sin(deltaLon/float64(2));
+    //6371 = Earth's radius in km 
+    return (float64(6371000) * float64(2) * math.Atan2( math.Sqrt(a), math.Sqrt(1-a) ) );
+}
+//if reference point is inside location boundry
+func (location Location) nearby(target Place, reference Place) (bool) {
+    var radius_meters float64 = target.radius.avg + reference.radius.avg;
+    //log.Printf("Reference location: %f, %f", reference.point.latitude, reference.point.longitude);
+    log.Printf("Target location: %f, %f", target.point.latitude, target.point.longitude);
+    //log.Printf("Radius: %d meters", radius_meters );
+    var distance float64 = distance(target, reference)
+    log.Printf("Distance: %f meters", distance);
+    return distance < float64(radius_meters);
+}
+
+
+//TODO: pass valid() func as generic arg
+func collapse( nodes []Location, reference Place, found []Location ) ( []Location )  {
+    var deep []Location = []Location{}
+    if len(nodes) > 0 {
+        for _, child := range nodes {
+            if true == child.valid(reference) {
+                found = append( found, []Location{
+                 child,   
+                }... )
+                if children := child.children; len(children) > 0 {
+                    deep = append( deep, collapse( children, reference, []Location{} )... );
+                }
+            } else {
+                log.Print("Invalid node " + child.name);
+            }
+        }
+    }
+    return append( found, deep... );
+}
+
+func init() {
+    log.Printf("Started %d", time.Now().Local().Unix())
+
+	http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
+        if r.URL.Path != "/" {
+            http.NotFound(w, r)
+            return
+        }
+        var original Location = Country()
         var reference = Place{
             point: Point{
                 latitude: 38.5501232, //38.5445404,
@@ -262,12 +270,11 @@ func init() {
                 avg: 20.0,
             },
         }
-        for _, v := range collapse( []Location{ united_states }, reference, make([]Location,0) ) {
+        for _, v := range collapse( []Location{ original }, reference, make([]Location,0) ) {
             log.Print( "Place " + v.name );
         }
-
-        response, _ := json.Marshal(united_states.children[0].children[0].name)
-	    fmt.Fprint(w, string(response))
+        response, _ := json.Marshal(original.children[0].children[0].name)
+        fmt.Fprint(w, string(response))
     } )
 }
 
